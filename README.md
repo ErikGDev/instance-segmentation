@@ -12,7 +12,7 @@ and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/
 
 For the installation of Detectron2, please refer to the [official Detectron2 GitHub](https://github.com/facebookresearch/detectron2)
 
-## Accuracy of Model
+## Accuracy and Specifications of Model
 
 **Intel® RealSense™ D435 Camera**
 
@@ -31,7 +31,11 @@ Therefore with a depth resolution of 848x480, the MinZ is ~16.8cm. If the object
 | Matterport Mask R-CNN | ReSNet-101-FPN | 38.0 | 55.8 | <b>41.3</b> | 17.9 | <b>45.5</b> | <b>55.9</b> |
 | Detectron2 Mask R-CNN | ReSNet-101-FPN | <b>38.6</b> | <b>60.4</b> | <b>41.3</b> | <b>19.5</b> | 41.3 | 55.3 |
 
-I performed validation tests on the segmentation masks created on the 2017 COCO validation dataset. The standard COCO validation metrics include average AP over IoU thresholds, AP<sub>50</sub>, AP<sub>75</sub>, and AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub> (AP at different scales). These results were then compared to COCO validation results from the [original paper](https://arxiv.org/abs/1703.06870). Clearly, Matterport's Mask R-CNN outperforms the original Mask R-CNN with respect to average precision. It also outperformed state-of-the art COCO segmentation competition winners from the 2015 and 2016 challenge. The reason I chose not to use the models of competition winners from 2017 and 2018 is to avoid overfitting.
+I performed validation tests on the segmentation masks created on the 2017 COCO validation dataset. The standard COCO validation metrics include average AP over IoU thresholds, AP<sub>50</sub>, AP<sub>75</sub>, and AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub> (AP at different scales). These results were then compared to COCO validation results from the [original paper](https://arxiv.org/abs/1703.06870) and a popular [Mask R-CNN implementation by Matterport](https://github.com/matterport/Mask_RCNN). Clearly, Detectron2's Mask R-CNN outperforms the original Mask R-CNN and Matterport's Mask R-CNN with respect to average precision. It also outperformed state-of-the art COCO segmentation competition winners from the 2015 and 2016 challenge. The reason I chose not to use the models of competition winners from 2017 and 2018 is to avoid overfitting. Furthermore these models trade inference time for a higher accuracy.
+
+**Why this model?**
+
+I decided to use Detectron2's Mask R-CNN with a ReSNet-101-FPN backbone. Upon comparing Detectron2 to the MMDetection's models which won first place in the 2018 segmentation COCO challenge, it is evident that my choice of model is the correct choice for high-speed real-time video. 
 
 ## Citing Detectron
 
