@@ -52,7 +52,9 @@ _C.INPUT.MIN_SIZE_TRAIN_SAMPLING = "choice"
 # Maximum size of the side of the image during training
 _C.INPUT.MAX_SIZE_TRAIN = 1333
 # Size of the smallest side of the image during testing. Set to zero to disable resize in testing.
+""""""
 _C.INPUT.MIN_SIZE_TEST = 800
+#_C.INPUT.MIN_SIZE_TEST = 0
 # Maximum size of the side of the image during testing
 _C.INPUT.MAX_SIZE_TEST = 1333
 
