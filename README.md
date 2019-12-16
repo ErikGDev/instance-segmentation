@@ -1,45 +1,37 @@
 <img src=".github/Detectron2-Logo-Horz.svg" width="300" >
 
-Detectron2 is Facebook AI Research's next generation software system
-that implements state-of-the-art object detection algorithms.
-It is a ground-up rewrite of the previous version,
+This is a fork of [Facebook AI Research's](https://github.com/facebookresearch) implementation of [Mask R-CNN](https://arxiv.org/abs/1703.06870), Detectron2. Detectron2 is a complete write-up from its previous version
 [Detectron](https://github.com/facebookresearch/Detectron/),
-and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark/).
+and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark/). This Mask R-CNN implementation is powered by [PyTorch](https://pytorch.org).
 
 <div align="center">
   <img src="https://user-images.githubusercontent.com/1381301/66535560-d3422200-eace-11e9-9123-5535d469db19.png"/>
 </div>
 
-### What's New
-* It is powered by the [PyTorch](https://pytorch.org) deep learning framework.
-* Includes more features such as panoptic segmentation, densepose, Cascade R-CNN, rotated bounding boxes, etc.
-* Can be used as a library to support [different projects](projects/) on top of it.
-  We'll open source more research projects in this way.
-* It [trains much faster](https://detectron2.readthedocs.io/notes/benchmarks.html).
-
-See our [blog post](https://ai.facebook.com/blog/-detectron2-a-pytorch-based-modular-object-detection-library-/)
-to see more demos and learn about detectron2.
-
 ## Installation
 
-See [INSTALL.md](INSTALL.md).
+For the installation of Detectron2, please refer to the [official Detectron2 GitHub](https://github.com/facebookresearch/detectron2)
 
-## Quick Start
+## Accuracy of Model
 
-See [GETTING_STARTED.md](GETTING_STARTED.md),
-or the [Colab Notebook](https://colab.research.google.com/drive/16jcaJoc6bCFAQ96jDe2HwtXj7BMD_-m5).
+**Intel® RealSense™ D435 Camera**
 
-Learn more at our [documentation](https://detectron2.readthedocs.org).
-And see [projects/](projects/) for some projects that are built on top of detectron2.
+The depth value uncertaincy for the D435 camera is less than one percent of the distance from the object. If the camera is 1 metre from the object, the expected uncertainty is between 2.5mm and 5mm.
+When the object is too close to the camera, the depth values will return 0mm. This threshold is known as MinZ. The formula for calculating MinZ is
 
-## Model Zoo and Baselines
+MinZ(mm) = focal length(pixels)𝒙 Baseline(mm)/126
 
-We provide a large set of baseline results and trained models available for download in the [Detectron2 Model Zoo](MODEL_ZOO.md).
+Therefore with a depth resolution of 848x480, the MinZ is ~16.8cm. If the object is within this distance, no value is returned.
 
+**Segmentation Validation Results**
 
-## License
+|  | Backbone | AP | AP<sub>50</sub> | AP<sub>75</sub> | AP<sub>S</sub> | AP<sub>M</sub> | AP<sub>L</sub> |
+| :--- | :--- | :---: | :---: | :---: |  :---:  | :---: | :---: |
+| Original Mask R-CNN   | ResNet-101-FPN  | 35.7 | 58.0 | 37.8 | 15.5 | 38.1 | 52.4 |
+| Matterport Mask R-CNN | ReSNet-101-FPN | 38.0 | 55.8 | <b>41.3</b> | 17.9 | <b>45.5</b> | <b>55.9</b> |
+| Detectron2 Mask R-CNN | ReSNet-101-FPN | <b>38.6</b> | <b>60.4</b> | <b>41.3</b> | <b>19.5</b> | 41.3 | 55.3 |
 
-Detectron2 is released under the [Apache 2.0 license](LICENSE).
+I performed validation tests on the segmentation masks created on the 2017 COCO validation dataset. The standard COCO validation metrics include average AP over IoU thresholds, AP<sub>50</sub>, AP<sub>75</sub>, and AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub> (AP at different scales). These results were then compared to COCO validation results from the [original paper](https://arxiv.org/abs/1703.06870). Clearly, Matterport's Mask R-CNN outperforms the original Mask R-CNN with respect to average precision. It also outperformed state-of-the art COCO segmentation competition winners from the 2015 and 2016 challenge. The reason I chose not to use the models of competition winners from 2017 and 2018 is to avoid overfitting.
 
 ## Citing Detectron
 
