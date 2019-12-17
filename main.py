@@ -3,6 +3,10 @@ import time
 import cv2
 import pyrealsense2 as rs 
 import random
+import math
+
+from matplotlib import pyplot as plt
+from statistics import median
 
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
@@ -13,6 +17,14 @@ from detectron2.utils.visualizer import ColorMode
 from detectron2.data import MetadataCatalog
 
 import torch, torchvision
+
+# Resolution of camera streams
+RESOLUTION_X = 1280
+RESOLUTION_Y = 720
+
+# Configuration for histogram for depth image
+NUM_BINS = 500
+MAX_RANGE = 10000
 
 def find_mask_centre(mask, color_image):
     """
@@ -27,15 +39,16 @@ def find_mask_centre(mask, color_image):
 
 def create_predictor():
     """
-    Setup config and return predictor
+    Setup config and return predictor. See config/defaults.py for more options
     """
     cfg = get_cfg()
 
     cfg.merge_from_file("configs/COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml")
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
+    # Mask R-CNN ResNet101 FPN weights
     cfg.MODEL.WEIGHTS = "model_final_a3ec72.pkl"
-    #cfg.INPUT.MIN_SIZE_TEST = 0
-    #cfg.MODEL.DEVICE = "cpu"
+    # This determines the resizing of the image. At 0, resizing is disabled.
+    cfg.INPUT.MIN_SIZE_TEST = 0
 
     return (cfg, DefaultPredictor(cfg))
 
@@ -70,8 +83,8 @@ if __name__ == "__main__":
     pipeline = rs.pipeline()
     config = rs.config()
 
-    config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
-    config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+    config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
+    config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
 
     # Start streaming
     profile = pipeline.start(config)
@@ -85,12 +98,12 @@ if __name__ == "__main__":
         
         frames = pipeline.wait_for_frames()
 
-        depth_frame = frames.get_depth_frame().as_depth_frame()
+        depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
 
         # Convert image to numpy array
         color_image = np.asanyarray(color_frame.get_data())
-        
+        depth_image = np.asanyarray(depth_frame.get_data())
         cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
 
         t1 = time.time()
@@ -117,16 +130,37 @@ if __name__ == "__main__":
             assigned_colors=None,
             alpha=0.3
         )
-
-
+        
         for i in range(num_masks):
-
+            """
+            Converting depth image to a histogram with num bins of NUM_BINS 
+            and depth range of (0 - MAX_RANGE millimeters). Iterate through each
+            histogram bin until half of the mask area has been accounted for. 
+            This is the median of the histogram and therefore the median depth.
+            """
+            mask_area = masks[i].area()
+            num_median = math.floor(mask_area / 2)
+            histg = cv2.calcHist([depth_image], [0], masks[i].mask, [NUM_BINS], [0, MAX_RANGE])
+            
+            counter = 0
+            centre_depth = 0.0
+            for x in range(len(histg)):
+                counter += histg[x][0]
+                if counter >= num_median:
+                    # Half of histogram is iterated through,
+                    # Therefore this bin contains the median
+                    centre_depth = "{:.2f}m".format(x / 50)
+                    break 
+           
+            #print("\nCOUNTER IS: {}".format(counter))
+            #print("ACTUAL AREA: {}\n".format(mask_area))
+        
             cX, cY = find_mask_centre(masks[i]._mask, v.output)
             v.draw_circle((cX, cY), (0, 0, 0))
-            
-            centre_depth = "{:.2f}".format(depth_frame.get_distance(cX, cY))
-            v.draw_text(centre_depth, (cX, cY))
 
+            v.draw_text(centre_depth, (cX, cY + 20))
+            
+        
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         cv2.imshow('', v.output.get_image()[:, :, ::-1])
         #cv2.imshow('Depth', depth_colormap)
@@ -140,4 +174,3 @@ if __name__ == "__main__":
         
     pipeline.stop()
     cv2.destroyAllWindows()
-
