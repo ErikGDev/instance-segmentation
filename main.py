@@ -4,6 +4,7 @@ import cv2
 import pyrealsense2 as rs 
 import random
 import math
+import argparse
 
 from matplotlib import pyplot as plt
 from statistics import median
@@ -25,17 +26,6 @@ RESOLUTION_Y = 720
 # Configuration for histogram for depth image
 NUM_BINS = 500
 MAX_RANGE = 10000
-
-def find_mask_centre(mask, color_image):
-    """
-    Finding centre of mask and drawing a circle at the centre
-    """
-    moments = cv2.moments(np.float32(mask))
-
-    cX = int(moments["m10"] / moments["m00"])
-    cY = int(moments["m01"] / moments["m00"])
-
-    return cX, cY
 
 def create_predictor():
     """
@@ -74,17 +64,44 @@ def format_results(predictions, class_names):
 
     return (masks, boxes, labels)
     
+def find_mask_centre(mask, color_image):
+    """
+    Finding centre of mask and drawing a circle at the centre
+    """
+    moments = cv2.moments(np.float32(mask))
+
+    cX = int(moments["m10"] / moments["m00"])
+    cY = int(moments["m01"] / moments["m00"])
+
+    return cX, cY
+
+def setup_image_config(video_file=None):
+    """
+
+    """
+    config = rs.config()
+
+    if video_file is None:
+        config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
+        config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
+    else:
+        config.enable_device_from_file(video_file)
+
+    return config
 
 if __name__ == "__main__":
 
     cfg, predictor = create_predictor()
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--file', help='type --file=file-name.bag to stream using file')
+    args = parser.parse_args()
+    
+    config = setup_image_config(args.file)
+
     # Configure video streams
     pipeline = rs.pipeline()
-    config = rs.config()
-
-    config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
-    config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
+    
 
     # Start streaming
     profile = pipeline.start(config)
