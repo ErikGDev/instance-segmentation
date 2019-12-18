@@ -77,7 +77,9 @@ def find_mask_centre(mask, color_image):
 
 def setup_image_config(video_file=None):
     """
-
+    Setup config and video steams. If --file is specified as an argument, setup
+    stream from file. video_file is by default None, and thus will by default stream
+    from the device connected to the USB.
     """
     config = rs.config()
 
@@ -158,16 +160,21 @@ if __name__ == "__main__":
             mask_area = masks[i].area()
             num_median = math.floor(mask_area / 2)
             histg = cv2.calcHist([depth_image], [0], masks[i].mask, [NUM_BINS], [0, MAX_RANGE])
-            
+            #plt.plot(histg)
+            #plt.show()
             counter = 0
             centre_depth = 0.0
-            for x in range(len(histg)):
-                counter += histg[x][0]
-                if counter >= num_median:
-                    # Half of histogram is iterated through,
-                    # Therefore this bin contains the median
-                    centre_depth = "{:.2f}m".format(x / 50)
-                    break 
+            print(histg[0][0])
+            if histg[0][0] >= num_median:
+                centre_depth = "0.00m"
+            else:
+                for x in range(1, len(histg)):
+                    counter += histg[x][0]
+                    if counter >= num_median:
+                        # Half of histogram is iterated through,
+                        # Therefore this bin contains the median
+                        centre_depth = "{:.2f}m".format(x / 50)
+                        break 
            
             #print("\nCOUNTER IS: {}".format(counter))
             #print("ACTUAL AREA: {}\n".format(mask_area))
