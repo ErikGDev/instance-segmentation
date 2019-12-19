@@ -27,6 +27,7 @@ RESOLUTION_Y = 720
 NUM_BINS = 500
 MAX_RANGE = 10000
 
+
 def create_predictor():
     """
     Setup config and return predictor. See config/defaults.py for more options
@@ -41,6 +42,7 @@ def create_predictor():
     cfg.INPUT.MIN_SIZE_TEST = 0
 
     return (cfg, DefaultPredictor(cfg))
+
 
 def format_results(predictions, class_names):
     """
@@ -64,6 +66,7 @@ def format_results(predictions, class_names):
 
     return (masks, boxes, labels)
     
+
 def find_mask_centre(mask, color_image):
     """
     Finding centre of mask and drawing a circle at the centre
@@ -74,6 +77,7 @@ def find_mask_centre(mask, color_image):
     cY = int(moments["m01"] / moments["m00"])
 
     return cX, cY
+
 
 def setup_image_config(video_file=None):
     """
@@ -87,9 +91,33 @@ def setup_image_config(video_file=None):
         config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
         config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
     else:
-        config.enable_device_from_file(video_file)
+        try:
+            config.enable_device_from_file(video_file)
+        except:
+            print("Cannot enable device from: '{}'".format(video_file))
 
     return config
+
+
+def find_median_depth(mask_area, num_median, histg):
+    """
+    Iterate through all histogram bins and stop at the median value. This is the
+    median depth of the mask.
+    """
+    
+    counter = 0
+    centre_depth = "0.00"
+
+    for x in range(0, len(histg)):
+        counter += histg[x][0]
+        if counter >= num_median:
+            # Half of histogram is iterated through,
+            # Therefore this bin contains the median
+            centre_depth = "{:.2f}m".format(x / 50)
+            break 
+
+    return centre_depth
+
 
 if __name__ == "__main__":
 
@@ -104,7 +132,6 @@ if __name__ == "__main__":
     # Configure video streams
     pipeline = rs.pipeline()
     
-
     # Start streaming
     profile = pipeline.start(config)
 
@@ -153,29 +180,14 @@ if __name__ == "__main__":
         for i in range(num_masks):
             """
             Converting depth image to a histogram with num bins of NUM_BINS 
-            and depth range of (0 - MAX_RANGE millimeters). Iterate through each
-            histogram bin until half of the mask area has been accounted for. 
-            This is the median of the histogram and therefore the median depth.
+            and depth range of (0 - MAX_RANGE millimeters)
             """
             mask_area = masks[i].area()
             num_median = math.floor(mask_area / 2)
             histg = cv2.calcHist([depth_image], [0], masks[i].mask, [NUM_BINS], [0, MAX_RANGE])
-            #plt.plot(histg)
-            #plt.show()
-            counter = 0
-            centre_depth = 0.0
-            print(histg[0][0])
-            if histg[0][0] >= num_median:
-                centre_depth = "0.00m"
-            else:
-                for x in range(1, len(histg)):
-                    counter += histg[x][0]
-                    if counter >= num_median:
-                        # Half of histogram is iterated through,
-                        # Therefore this bin contains the median
-                        centre_depth = "{:.2f}m".format(x / 50)
-                        break 
-           
+
+            centre_depth = find_median_depth(mask_area, num_median, histg)
+            
             #print("\nCOUNTER IS: {}".format(counter))
             #print("ACTUAL AREA: {}\n".format(mask_area))
         
