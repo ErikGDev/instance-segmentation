@@ -44,6 +44,28 @@ def create_predictor():
     return (cfg, DefaultPredictor(cfg))
 
 
+def setup_image_config(video_file=None):
+    """
+    Setup config and video steams. If --file is specified as an argument, setup
+    stream from file. The input of --file is a .bag file in the bag_files folder.
+    .bag files can be created using d435_to_file in the tools folder.
+    video_file is by default None, and thus will by default stream from the 
+    device connected to the USB.
+    """
+    config = rs.config()
+
+    if video_file is None:
+        config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
+        config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
+    else:
+        try:
+            config.enable_device_from_file("bag_files/{}".format(video_file))
+        except:
+            print("Cannot enable device from: '{}'".format(video_file))
+
+    return config
+
+
 def format_results(predictions, class_names):
     """
     Format results so they can be used by overlay_instances function
@@ -79,26 +101,6 @@ def find_mask_centre(mask, color_image):
     return cX, cY
 
 
-def setup_image_config(video_file=None):
-    """
-    Setup config and video steams. If --file is specified as an argument, setup
-    stream from file. video_file is by default None, and thus will by default stream
-    from the device connected to the USB.
-    """
-    config = rs.config()
-
-    if video_file is None:
-        config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
-        config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
-    else:
-        try:
-            config.enable_device_from_file(video_file)
-        except:
-            print("Cannot enable device from: '{}'".format(video_file))
-
-    return config
-
-
 def find_median_depth(mask_area, num_median, histg):
     """
     Iterate through all histogram bins and stop at the median value. This is the
@@ -113,7 +115,7 @@ def find_median_depth(mask_area, num_median, histg):
         if counter >= num_median:
             # Half of histogram is iterated through,
             # Therefore this bin contains the median
-            centre_depth = "{:.2f}m".format(x / 50)
+            centre_depth = "{:.2f}m".format(x/50)
             break 
 
     return centre_depth

@@ -6,7 +6,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 
-path_to_bag = "rgbd_output.bag"  # Location of output file.
+path_to_bag = "../bag_files/rgbd_output.bag"  # Location of output file.
 
 config = rs.config()
 
