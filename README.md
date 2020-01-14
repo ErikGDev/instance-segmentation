@@ -10,9 +10,15 @@ In this project, real-time video and depth values from a [Intel® RealSense™ D
   <img src="https://user-images.githubusercontent.com/1381301/66535560-d3422200-eace-11e9-9123-5535d469db19.png"/>
 </div>
 
-## Installation
+## Usage
+
+**Installation**
 
 For the installation of Detectron2, please refer to the [official Detectron2 GitHub](https://github.com/facebookresearch/detectron2)
+
+**After Installation**
+
+Copy and paste main.py from this directory into your new Detectron2 directory. To perform instance segmentation straight from a D435 camera attached to a USB port, access the Detectron2 directory and type 'python3 main.py'. If using .bag files, type 'python3 main.py --file={filename}' where {filename} is the name of the input .bag file. To create .bag files, use d435_to_file.py in the tools folder.
 
 ## Accuracy and Specifications of Model
 
