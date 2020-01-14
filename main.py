@@ -5,6 +5,7 @@ import pyrealsense2 as rs
 import random
 import math
 import argparse
+from PIL import Image
 
 from matplotlib import pyplot as plt
 from statistics import median
@@ -55,6 +56,7 @@ def setup_image_config(video_file=None):
     config = rs.config()
 
     if video_file is None:
+        
         config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
         config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
     else:
@@ -120,16 +122,42 @@ def find_median_depth(mask_area, num_median, histg):
 
     return centre_depth
 
+def debug_plots(color_image, depth_image, mask, histg, depth_colormap):
+    """
+    This function is used for debugging purposes. This plots the depth color-
+    map, mask, mask and depth color-map bitwise_and, and histogram distrobutions
+    of the full image and the masked image.
+    """
+    full_hist = cv2.calcHist([depth_image], [0], None, [NUM_BINS], [0, MAX_RANGE])
+    masked_depth_image = cv2.bitwise_and(depth_colormap, depth_colormap, mask= mask)
+
+    plt.figure()
+            
+    plt.subplot(2, 2, 1)
+    plt.imshow(depth_colormap)
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(masks[i].mask)
+
+    plt.subplot(2, 2, 3).set_title(labels[i])
+    plt.imshow(masked_depth_image)
+
+    plt.subplot(2, 2, 4)
+    plt.plot(full_hist)
+    plt.plot(histg)
+    plt.xlim([0, 600])
+    plt.show()
 
 if __name__ == "__main__":
 
     cfg, predictor = create_predictor()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file', help='type --file=file-name.bag to stream using file')
+    parser.add_argument('--file', help='type --file=file-name.bag to stream using file instead of webcam')
     args = parser.parse_args()
     
     config = setup_image_config(args.file)
+
 
     # Configure video streams
     pipeline = rs.pipeline()
@@ -146,12 +174,15 @@ if __name__ == "__main__":
         
         frames = pipeline.wait_for_frames()
 
-        depth_frame = frames.get_depth_frame()
+        align = rs.align(rs.stream.color)
+        frames = align.process(frames)
+
         color_frame = frames.get_color_frame()
+        aligned_depth_frame = frames.get_depth_frame()
+        depth_image = np.asanyarray(aligned_depth_frame.get_data())
 
         # Convert image to numpy array
         color_image = np.asanyarray(color_frame.get_data())
-        depth_image = np.asanyarray(depth_frame.get_data())
         cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
 
         t1 = time.time()
@@ -184,23 +215,25 @@ if __name__ == "__main__":
             Converting depth image to a histogram with num bins of NUM_BINS 
             and depth range of (0 - MAX_RANGE millimeters)
             """
+        
             mask_area = masks[i].area()
             num_median = math.floor(mask_area / 2)
-            histg = cv2.calcHist([depth_image], [0], masks[i].mask, [NUM_BINS], [0, MAX_RANGE])
-
-            centre_depth = find_median_depth(mask_area, num_median, histg)
             
-            #print("\nCOUNTER IS: {}".format(counter))
-            #print("ACTUAL AREA: {}\n".format(mask_area))
+            histg = cv2.calcHist([depth_image], [0], masks[i].mask, [NUM_BINS], [0, MAX_RANGE])
+            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+            
+            # Uncomment this to use the debugging function
+            #debug_plots(color_image, depth_image, masks[i].mask, histg, depth_colormap)
+            
+            centre_depth = find_median_depth(mask_area, num_median, histg)
         
             cX, cY = find_mask_centre(masks[i]._mask, v.output)
             v.draw_circle((cX, cY), (0, 0, 0))
-
             v.draw_text(centre_depth, (cX, cY + 20))
             
         
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-        cv2.imshow('', v.output.get_image()[:, :, ::-1])
+        cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
         #cv2.imshow('Depth', depth_colormap)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -212,3 +245,4 @@ if __name__ == "__main__":
         
     pipeline.stop()
     cv2.destroyAllWindows()
+    
