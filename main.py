@@ -164,6 +164,7 @@ if __name__ == "__main__":
     
     # Start streaming
     profile = pipeline.start(config)
+    align = rs.align(rs.stream.color)
 
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
     print("Depth Scale is: {:.4f}m".format(depth_scale))
@@ -173,20 +174,24 @@ if __name__ == "__main__":
         time_start = time.time()
         
         frames = pipeline.wait_for_frames()
-
-        align = rs.align(rs.stream.color)
         frames = align.process(frames)
 
         color_frame = frames.get_color_frame()
-        aligned_depth_frame = frames.get_depth_frame()
-        depth_image = np.asanyarray(aligned_depth_frame.get_data())
-
+        depth_frame = frames.get_depth_frame()
+        
         # Convert image to numpy array
         color_image = np.asanyarray(color_frame.get_data())
+        depth_image = np.asanyarray(depth_frame.get_data())
+
         cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
 
+        t3 = time.time()
+        print("Getting frames took {:.2f} time".format(t3 - time_start))
+
         t1 = time.time()
+
         outputs = predictor(color_image)
+        
         t2 = time.time()
         print("Model took {:.2f} time".format(t2 - t1))
 
@@ -197,6 +202,8 @@ if __name__ == "__main__":
         else:
             num_masks = 0
         
+        detectron_time = time.time()
+
         v = Visualizer(color_image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]))
         
         masks, boxes, labels = format_results(predictions, v.metadata.get("thing_classes"))
@@ -209,7 +216,10 @@ if __name__ == "__main__":
             assigned_colors=None,
             alpha=0.3
         )
+        detectron_end = time.time()
+        print("\nDetectron time took {:.2f} seconds\n".format(detectron_end-detectron_time))
         
+        m1 = time.time()
         for i in range(num_masks):
             """
             Converting depth image to a histogram with num bins of NUM_BINS 
@@ -231,7 +241,8 @@ if __name__ == "__main__":
             v.draw_circle((cX, cY), (0, 0, 0))
             v.draw_text(centre_depth, (cX, cY + 20))
             
-        
+        m2 = time.time()
+        print("Masks took {:.2f} seconds".format(m2 - m1))
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
         #cv2.imshow('Depth', depth_colormap)
