@@ -31,6 +31,10 @@ MinZ(mm) = focal length(pixels)𝒙 Baseline(mm)/126
 
 Therefore with a depth resolution of 848x480, the MinZ is ~16.8cm. If the object is within this distance, no value is returned.
 
+**How is each Depth Value Calculated?**
+
+To find the distance of each object, the median depth pixel is used. All pixels associated to the object are abstracted to a histogram with a max distance of 10m (Max range of the D435), and 500 bins. This means that the depth values will change with intervals of 0.02m.
+
 **Segmentation Validation Results**
 
 |  | Backbone | AP | AP<sub>50</sub> | AP<sub>75</sub> | AP<sub>S</sub> | AP<sub>M</sub> | AP<sub>L</sub> |
