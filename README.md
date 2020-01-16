@@ -7,7 +7,7 @@ and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/
 In this project, real-time video and depth values from a [Intel® RealSense™ D435 camera](https://www.intelrealsense.com/depth-camera-d435/) are inputted into Detectron2's Mask R-CNN model. The output is the same real-time video (3-6fps) with instance segmentation masks and labels superimposed. The depth values of the centre of each object are also outputted. 
 
 <div align="center">
-  <img src="https://user-images.githubusercontent.com/1381301/66535560-d3422200-eace-11e9-9123-5535d469db19.png"/>
+  <img src="images/gif.gif"/>
 </div>
 
 ## Usage
