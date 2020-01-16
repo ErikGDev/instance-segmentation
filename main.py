@@ -5,7 +5,6 @@ import pyrealsense2 as rs
 import random
 import math
 import argparse
-from PIL import Image
 
 from matplotlib import pyplot as plt
 from statistics import median
@@ -59,6 +58,7 @@ def setup_image_config(video_file=None):
         
         config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
         config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
+        config.enable_record_to_file("output.bag")
     else:
         try:
             config.enable_device_from_file("bag_files/{}".format(video_file))
@@ -109,12 +109,11 @@ def find_median_depth(mask_area, num_median, histg):
     median depth of the mask.
     """
     
-    counter = 0
+    median_counter = 0
     centre_depth = "0.00"
-
     for x in range(0, len(histg)):
-        counter += histg[x][0]
-        if counter >= num_median:
+        median_counter += histg[x][0]
+        if median_counter >= num_median:
             # Half of histogram is iterated through,
             # Therefore this bin contains the median
             centre_depth = "{:.2f}m".format(x/50)
@@ -183,11 +182,6 @@ if __name__ == "__main__":
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
-        cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-
-        t3 = time.time()
-        print("Getting frames took {:.2f} time".format(t3 - time_start))
-
         t1 = time.time()
 
         outputs = predictor(color_image)
@@ -216,10 +210,8 @@ if __name__ == "__main__":
             assigned_colors=None,
             alpha=0.3
         )
-        detectron_end = time.time()
-        print("\nDetectron time took {:.2f} seconds\n".format(detectron_end-detectron_time))
         
-        m1 = time.time()
+        
         for i in range(num_masks):
             """
             Converting depth image to a histogram with num bins of NUM_BINS 
@@ -241,8 +233,7 @@ if __name__ == "__main__":
             v.draw_circle((cX, cY), (0, 0, 0))
             v.draw_text(centre_depth, (cX, cY + 20))
             
-        m2 = time.time()
-        print("Masks took {:.2f} seconds".format(m2 - m1))
+        
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
         #cv2.imshow('Depth', depth_colormap)
@@ -252,7 +243,7 @@ if __name__ == "__main__":
         time_end = time.time()
         total_time = time_end - time_start
         print("Time to process frame: {:.2f}".format(total_time))
-        print("FPS: {:.2f}".format(1/total_time))
+        print("FPS: {:.2f}\n".format(1/total_time))
         
     pipeline.stop()
     cv2.destroyAllWindows()
