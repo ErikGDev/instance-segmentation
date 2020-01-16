@@ -168,6 +168,9 @@ if __name__ == "__main__":
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
     print("Depth Scale is: {:.4f}m".format(depth_scale))
 
+    vid_cod = cv2.VideoWriter_fourcc(*'XVID')
+    output = cv2.VideoWriter("../gif.mp4", vid_cod, 20.0, (1280, 720))
+
     while True:
         
         time_start = time.time()
@@ -235,6 +238,7 @@ if __name__ == "__main__":
             
         
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+        output.write(v.output.get_image()[:, :, ::-1])
         cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
         #cv2.imshow('Depth', depth_colormap)
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -246,5 +250,6 @@ if __name__ == "__main__":
         print("FPS: {:.2f}\n".format(1/total_time))
         
     pipeline.stop()
+    output.release()
     cv2.destroyAllWindows()
     
