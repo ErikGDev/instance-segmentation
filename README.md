@@ -4,7 +4,7 @@ This is a fork of [Facebook AI Research's](https://github.com/facebookresearch) 
 [Detectron](https://github.com/facebookresearch/Detectron/),
 and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark/). This Mask R-CNN implementation is powered by [PyTorch](https://pytorch.org) and is based on Feature Pyramid Network (FPN) and a ResNet101 backbone.
 
-In this project, real-time video and depth values from a [Intel® RealSense™ D435 camera](https://www.intelrealsense.com/depth-camera-d435/) are inputted into Detectron2's Mask R-CNN model. The output is the same real-time video (3-6fps) with instance segmentation masks and labels superimposed. The depth values of the centre of each object are also outputted. 
+In this project, real-time video and depth values from a [Intel® RealSense™ D435 camera](https://www.intelrealsense.com/depth-camera-d435/) are inputted into Detectron2's Mask R-CNN model. The output is the same real-time video (3-6fps) with instance segmentation masks and labels superimposed. The median depth values of each object are also outputted. 
 
 <div>
   <img src="images/gif.gif"/>
@@ -12,13 +12,30 @@ In this project, real-time video and depth values from a [Intel® RealSense™ D
 
 ## Usage
 
+**Requirements/Dependencies**
+
+- Linux or macOS
+- Python ≥ 3.6
+- PyTorch ≥ 1.3
+- [torchvision](https://github.com/pytorch/vision/) that matches the PyTorch installation.
+	You can install them together at [pytorch.org](https://pytorch.org) to make sure of this.
+  Please ensure that your version of CUDA is also compatible when installing.
+- OpenCV `pip install opencv-python`
+- PyRealSense `pip install pyrealsense2`
+- pycocotools: `pip install cython; pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'`
+- gcc & g++ ≥ 4.9
+
 **Installation**
 
-For the installation of Detectron2, please refer to the [official Detectron2 GitHub](https://github.com/facebookresearch/detectron2)
+For the installation of Detectron2 and its dependencies, please refer to the [official Detectron2 GitHub](https://github.com/facebookresearch/detectron2)
 
 **After Installation**
 
-Copy and paste main.py from this directory into your new Detectron2 directory. To perform instance segmentation straight from a D435 camera attached to a USB port, access the Detectron2 directory and type 'python3 main.py'. If using .bag files, type 'python3 main.py --file={filename}' where {filename} is the name of the input .bag file. To create .bag files, use d435_to_file.py in the tools folder.
+* Copy and paste main.py from this directory into your new Detectron2 directory.
+* To perform instance segmentation straight from a D435 camera attached to a USB port:
+  * Access the Detectron2 directory and type 'python3 main.py'. 
+* If using .bag files:
+  * Type 'python3 main.py --file={filename}' where {filename} is the name of the input .bag file. To create .bag files, use d435_to_file.py in the tools folder.
 
 ## Accuracy and Specifications of Model
 
