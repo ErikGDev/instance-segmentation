@@ -85,7 +85,7 @@ Sometimes objects can be recorded as 0m even though they are inside the MinZ and
 
 **How is each Depth Value Calculated?**
 
-To find the distance of each object, the median depth pixel is used. All pixels associated to the object are abstracted to a histogram with a max distance of 10m (Max range of the D435), and 500 bins. This means that the depth values will change with intervals of 0.02m.
+To find the distance of each object, the median depth pixel is used. All pixels associated to the object are abstracted to a histogram with a max distance of 10m (Max range of the D435), and 500 bins. The bins are looped through until the bin which contains the median is found. This means that the depth values will change with intervals of 0.02m.
 
 For smaller intervals of 0.01m, change the NUM_BINS constant to 1000, and change 
 
