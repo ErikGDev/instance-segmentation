@@ -7,7 +7,6 @@ import math
 import argparse
 
 from matplotlib import pyplot as plt
-from statistics import median
 
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
