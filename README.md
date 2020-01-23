@@ -59,20 +59,29 @@ Detectron2's Model Zoo displays the inference time and Mask AP for each model pr
 
 <img src="images/detectron2_model_zoo.png" />
 
-**Intel® RealSense™ D435 Camera**
-
-The depth value uncertaincy for the D435 camera is less than one percent of the distance from the object. If the camera is 1 metre from the object, the expected uncertainty is between 2.5mm and 5mm.
+## Intel® RealSense™ D435 Camera
 
 According to Intel's paper, [Best-Known-Methods for Tuning Intel® RealSense™ D400 Depth Cameras for Best Performance](https://www.intelrealsense.com/wp-content/uploads/2019/11/BKMs_Tuning_RealSense_D4xx_Cam.pdf), The depth RMS (root mean square) error increases rapidly when placing objects further away, especially when the distance is greater than 3m. The orange line on the graph below represents the depth RMS error on a D435 with HFOV=90deg, Xres=848, baseline=50mm and for subpixel=0.08.
 
 <img src="images/d435_rms_error.png" />
 
+**Insert My Testing Here**
 
-When the object is too close to the camera, the depth values will return 0mm. This threshold is known as MinZ. The formula for calculating MinZ is
+I performed my own testing, where I compared real distances of objects from the D435 to the distance measured by the stereo sensors on the D435. Rather than the depth RMS error, I compared the absolute depth error to the real distance of the object to the D435.
+
+This graph shows that the absolute error exponentially increases when the distance increases. This means the depth recordings will be most accurate when the object is closer to the camera.
+
+**When does the Object Record 0m?**
+
+When the object is too close to the camera, the depth values will return 0m. This threshold is known as MinZ. The formula for calculating MinZ is
 
 MinZ(mm) = focal length(pixels)𝒙 Baseline(mm)/126
 
 Therefore with a depth resolution of 848x480, the MinZ is ~16.8cm. If the object is within this distance, no value is returned.
+
+Similar to MinZ, MaxZ exists too. For the D435, the MaxZ is approximately 10m. Any object outside this range will also be recorded as 0m.
+
+Sometimes objects can be recorded as 0m even though they are inside the MinZ and MaxZ threshold. This usually occurs when there is too much noise on the depth image. This can occur when the target is not well textured. For more information on how to configure the D435 for specific environments and objects, refer to [this paper](https://www.intelrealsense.com/wp-content/uploads/2019/11/BKMs_Tuning_RealSense_D4xx_Cam.pdf).
 
 **How is each Depth Value Calculated?**
 
