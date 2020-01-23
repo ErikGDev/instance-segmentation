@@ -47,15 +47,15 @@ For the installation of Detectron2 and its dependencies, please refer to the [of
 | Matterport Mask R-CNN | ReSNet-101-FPN | 38.0 | 55.8 | <b>41.3</b> | 17.9 | <b>45.5</b> | <b>55.9</b> |
 | Detectron2 Mask R-CNN | ReSNet-101-FPN | <b>38.6</b> | <b>60.4</b> | <b>41.3</b> | <b>19.5</b> | 41.3 | 55.3 |
 
-I performed validation tests on the segmentation masks created on the 2017 COCO validation dataset. The standard COCO validation metrics include average AP over IoU thresholds, AP<sub>50</sub>, AP<sub>75</sub>, and AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub> (AP at different scales). These results were then compared to COCO validation results from the [original paper](https://arxiv.org/abs/1703.06870) and a popular [Mask R-CNN implementation by Matterport](https://github.com/matterport/Mask_RCNN). Clearly, Detectron2's Mask R-CNN outperforms the original Mask R-CNN and Matterport's Mask R-CNN with respect to average precision. It also outperformed state-of-the art COCO segmentation competition winners from the 2015 and 2016 challenge. The reason I chose not to use the models of competition winners from 2017 and 2018 is to avoid overfitting. Furthermore these models trade inference time for a higher accuracy.
+Validation tests were perfomed on the segmentation masks created on the 2017 COCO validation dataset. The standard COCO validation metrics include average AP over IoU thresholds, AP<sub>50</sub>, AP<sub>75</sub>, and AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub> (AP at different scales). These results were then compared to COCO validation results from the [original paper](https://arxiv.org/abs/1703.06870) and a popular [Mask R-CNN implementation by Matterport](https://github.com/matterport/Mask_RCNN). Clearly, Detectron2's Mask R-CNN outperforms the original Mask R-CNN and Matterport's Mask R-CNN with respect to average precision. It also outperformed state-of-the art COCO segmentation competition winners from the [2015 and 2016 challenge](http://cocodataset.org/#detection-leaderboard). The reason the competition winners from 2017 and 2018 were not chosen, was to avoid overfitting. Furthermore these models trade a slower inference time for a higher accuracy.
 
 **Why this model?**
 
-I decided to use Detectron2's Mask R-CNN with a ReSNet-101-FPN backbone. Upon comparing Detectron2 to [MMDetection's models](https://github.com/open-mmlab/mmdetection/blob/master/docs/MODEL_ZOO.md) which won first place in the [2018 segmentation COCO challenge](http://cocodataset.org/#detection-leaderboard), it is evident that my choice of model is the correct choice for high-speed real-time video. 
+Detectron2's Mask R-CNN with a ReSNet-101-FPN backbone was determined to be the optimal model. Upon comparing Detectron2 to [MMDetection's models](https://github.com/open-mmlab/mmdetection/blob/master/docs/MODEL_ZOO.md), which won first place in the [2018 segmentation COCO challenge](http://cocodataset.org/#detection-leaderboard), it is evident that the choice of model is appropriate for high-speed real-time video. 
 
 When comparing [Detectron2's Mask R-CNN](https://github.com/facebookresearch/detectron2/blob/master/MODEL_ZOO.md#coco-instance-segmentation-baselines-with-mask-r-cnn) to [MMDetection's Mask R-CNN](https://github.com/open-mmlab/mmdetection/blob/master/docs/MODEL_ZOO.md#mask-r-cnn), Detectron2 outperforms in both mask AP (38.6 vs 35.9) and inference time (0.070 s/im vs 0.105 s/im). MMDetectron does have models that are slightly more accurate than Detectron2's Mask R-CNN implementation, such as [the Hybrid Task Cascade model (HTC)](https://github.com/open-mmlab/mmdetection/blob/master/docs/MODEL_ZOO.md#hybrid-task-cascade-htc) however these often result in models that output masks at less than 4 fps. When adding the time to ouput the superimposed images, this would be insufficient for real-time.
 
-Detectron2's Model Zoo displays the inference time and Mask AP for each model provided. For the Mask R-CNN models, in my opinion the FPN model with a ResNet101 backbone has the best Mask AP for the short time it takes for inferences.
+Detectron2's Model Zoo displays the inference time and Mask AP for each model provided. For the Mask R-CNN models, the FPN model with a ResNet101 backbone has the best Mask AP for the short time it takes for inferences.
 
 <img src="images/detectron2_model_zoo.png" />
 
@@ -67,7 +67,7 @@ According to Intel's paper, [Best-Known-Methods for Tuning Intel® RealSense™ 
 
 **Insert My Testing Here**
 
-I performed my own testing, where I compared real distances of objects from the D435 to the distance measured by the stereo sensors on the D435. Rather than the depth RMS error, I compared the absolute depth error to the real distance of the object to the D435.
+Testing was performed on this program, where the real distances of objects from the D435 were compared to the distance measured by the stereo sensors on the D435. Rather than the depth RMS error, the absolute depth error was compared to the real distance of the object to the D435.
 
 This graph shows that the absolute error exponentially increases when the distance increases. This means the depth recordings will be most accurate when the object is closer to the camera.
 
@@ -79,7 +79,7 @@ MinZ(mm) = focal length(pixels)𝒙 Baseline(mm)/126
 
 Therefore with a depth resolution of 848x480, the MinZ is ~16.8cm. If the object is within this distance, no value is returned.
 
-Similar to MinZ, MaxZ exists too. For the D435, the MaxZ is approximately 10m. Any object outside this range will also be recorded as 0m.
+Similar to MinZ, MaxZ exists too. For the D435, the MaxZ is [approximately 10m](https://ark.intel.com/content/www/us/en/ark/products/128255/intel-realsense-depth-camera-d435.html). Any object outside this range will also be recorded as 0m.
 
 Sometimes objects can be recorded as 0m even though they are inside the MinZ and MaxZ threshold. This usually occurs when there is too much noise on the depth image. This can occur when the target is not well textured. For more information on how to configure the D435 for specific environments and objects, refer to [this paper](https://www.intelrealsense.com/wp-content/uploads/2019/11/BKMs_Tuning_RealSense_D4xx_Cam.pdf).
 
@@ -87,3 +87,8 @@ Sometimes objects can be recorded as 0m even though they are inside the MinZ and
 
 To find the distance of each object, the median depth pixel is used. All pixels associated to the object are abstracted to a histogram with a max distance of 10m (Max range of the D435), and 500 bins. This means that the depth values will change with intervals of 0.02m.
 
+For smaller intervals of 0.01m, change the NUM_BINS constant to 1000, and change 
+
+```centre_depth = "{:.2f}m".format(x / 50)```
+to
+```centre_depth = "{:.2f}m".format(x / 100)```
