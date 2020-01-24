@@ -67,7 +67,13 @@ According to Intel's paper, [Best-Known-Methods for Tuning Intel® RealSense™ 
 
 **Insert My Testing Here**
 
-Testing was performed on this program, where the real distances of objects from the D435 were compared to the distance measured by the stereo sensors on the D435. Rather than the depth RMS error, the absolute depth error was compared to the real distance of the object to the D435.
+Testing was performed on this program, where the real distances of objects from the D435 were compared to the distance measured by the stereo sensors on the D435. The true distance was found by measuring the distance between a box (with a flat front) and the parallel plane of the imagers.
+
+<img src="images/depth_vs_range.png" />
+
+from [Intel D400 Datasheet](https://www.mouser.ca/pdfdocs/Intel_D400_Series_Datasheet.pdf)
+
+The D435 recordings were measured on the [realsense-viewer](https://github.com/IntelRealSense/librealsense/tree/master/tools/realsense-viewer) program. The stereo resolution was set to 1280 x 720. Rather than the depth RMS error, the absolute depth error was compared to the real distance of the object to the D435.
 
 This graph shows that the absolute error exponentially increases when the distance increases. This means the depth recordings will be most accurate when the object is closer to the camera.
 
