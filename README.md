@@ -59,6 +59,16 @@ Detectron2's Model Zoo displays the inference time and Mask AP for each model pr
 
 <img src="images/detectron2_model_zoo.png" />
 
+**Config Settings**
+
+Config settings can be altered under the create_predictor function. To see default config settings and descriptions of each setting, refer to detectron2/defaults.py.
+
+The cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST line specifies the lower threshold for when the instance segmentation mask is shown to the user. For example, set cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7. If Detectron2 is at least 70% confident the object detected belongs to a class name, the mask is superimposed onto the image.
+
+The cfg.MODEL.WEIGHTS line specifies the pretrained weights used to perform instance segmentation. This program uses the ResNet101 FPN weights.
+
+The cfg.INPUT.MIN_SIZE_TEST line specifies the size of the smallest size of the image during testing/inference. If this is set to zero, resizing is disabled. 
+
 ## Intel® RealSense™ D435 Camera
 
 According to Intel's paper, [Best-Known-Methods for Tuning Intel® RealSense™ D400 Depth Cameras for Best Performance](https://www.intelrealsense.com/wp-content/uploads/2019/11/BKMs_Tuning_RealSense_D4xx_Cam.pdf), The depth RMS (root mean square) error increases rapidly when placing objects further away, especially when the distance is greater than 3m. The orange line on the graph below represents the depth RMS error on a D435 with HFOV=90deg, Xres=848, baseline=50mm and for subpixel=0.08.
