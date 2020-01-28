@@ -115,7 +115,7 @@ def find_median_depth(mask_area, num_median, histg):
         if median_counter >= num_median:
             # Half of histogram is iterated through,
             # Therefore this bin contains the median
-            centre_depth = "{:.2f}m".format(x/50)
+            centre_depth = "{:.2f}m".format(x / 50)
             break 
 
     return centre_depth
