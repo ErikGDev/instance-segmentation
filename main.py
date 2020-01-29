@@ -7,6 +7,7 @@ import math
 import argparse
 
 from matplotlib import pyplot as plt
+from sort import *
 
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
@@ -87,7 +88,22 @@ def format_results(predictions, class_names):
     masks = predictions.pred_masks.cpu().numpy()
     masks = [GenericMask(x, v.output.height, v.output.width) for x in masks]
 
-    return (masks, boxes, labels)
+    boxes_list = boxes.tensor.tolist()
+    scores_list = scores.tolist()
+
+    for i in range(len(scores_list)):
+        boxes_list[i].append(scores_list[i])
+    
+    boxes_list = np.asanyarray(boxes_list)
+    #print(scores_list)
+    #print(type(scores_list))
+    print(boxes_list)
+    #print(type(boxes_list))
+    #print(scores)
+    
+    #hello = np.append(boxes_list, scores_list)
+    #print(hello)
+    return (masks, boxes, boxes_list, labels)
     
 
 def find_mask_centre(mask, color_image):
@@ -164,6 +180,8 @@ if __name__ == "__main__":
     profile = pipeline.start(config)
     align = rs.align(rs.stream.color)
 
+    mot_tracker = Sort()
+
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
     print("Depth Scale is: {:.4f}m".format(depth_scale))
 
@@ -181,6 +199,11 @@ if __name__ == "__main__":
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
+        pad_x = max(color_image.shape[0] - color_image.shape[1], 0) * (RESOLUTION_Y / max(color_image.shape))
+        pad_y = max(color_image.shape[1] - color_image.shape[0], 0) * (RESOLUTION_Y / max(color_image.shape))
+        unpad_h = RESOLUTION_Y - pad_y
+        unpad_w = RESOLUTION_Y - pad_x
+
         t1 = time.time()
 
         outputs = predictor(color_image)
@@ -193,14 +216,33 @@ if __name__ == "__main__":
         if outputs['instances'].has('pred_masks'):
             num_masks = len(predictions.pred_masks)
         else:
-            num_masks = 0
+            continue
         
         detectron_time = time.time()
 
         v = Visualizer(color_image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]))
         
-        masks, boxes, labels = format_results(predictions, v.metadata.get("thing_classes"))
+        masks, boxes, boxes_list, labels = format_results(predictions, v.metadata.get("thing_classes"))
+        """
+        tracked_objects = mot_tracker.update(outputs['instances'])
+        unique_labels = labels.unique()
+        num_classes = len(unique_labels)
+        for x1, y1, x2, y2, obj_id, cls_pred in tracked_objects:
+            box_h = int(((y2 - y1) / unpad_h) * img.shape[0])
+            box_w = int(((x2 - x1) / unpad_w) * img.shape[1])
+            y1 = int(((y1 - pad_y // 2) / unpad_h) * img.shape[0])
+            x1 = int(((x1 - pad_x // 2) / unpad_w) * img.shape[1])
 
+            color = colors[int(obj_id) % len(colors)]
+            color = [i * 255 for i in color]
+            cls = classes[int(cls_pred)]
+            cv2.rectangle(color_image, (x1, y1), (x1+box_w, y1+box_h), color, 4)
+            cv2.rectangle(color_image, (x1, y1-35), (x1+len(cls)*19+60, y1), color, -1)
+            cv2.putText(color_image, cls + "-" + str(int(obj_id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 3)
+
+        """
+        #ret = np.asanyarray(outputs['instances'])
+        #print(outputs['instances'])
         v.overlay_instances(
             masks=masks,
             boxes=boxes,
@@ -234,6 +276,7 @@ if __name__ == "__main__":
             
         
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+        #cv2.imshow('Segmented Image', color_image)
         cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
         #cv2.imshow('Depth', depth_colormap)
         if cv2.waitKey(1) & 0xFF == ord('q'):
