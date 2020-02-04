@@ -97,7 +97,8 @@ class KalmanBoxTracker(object):
     self.hits = 0
     self.hit_streak = 0
     self.age = 0
-    self.objclass = bbox[6]
+    self.objclass = bbox[4]
+    self.matches = {}
 
   def update(self,bbox):
     """
@@ -128,6 +129,14 @@ class KalmanBoxTracker(object):
     Returns the current bounding box estimate.
     """
     return convert_x_to_bbox(self.kf.x)
+
+  def change_matches(self, matches):
+    self.matches = {}
+    d, dets = matches
+    d = d[0]
+    dets = dets.tolist()
+    self.matches[d] = dets
+    #print("d: {}\ndets: {}".format(d, dets))
 
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
   """
@@ -160,11 +169,13 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
       unmatched_trackers.append(m[1])
     else:
       matches.append(m.reshape(1,2))
+
   if(len(matches)==0):
     matches = np.empty((0,2),dtype=int)
   else:
     matches = np.concatenate(matches,axis=0)
 
+  #print(matches)
   return matches, np.array(unmatched_detections), np.array(unmatched_trackers)
 
 
@@ -177,6 +188,8 @@ class Sort(object):
     self.max_age = max_age
     self.min_hits = min_hits
     self.trackers = []
+    self.unmatched = []
+    self.matched = []
     self.frame_count = 0
 
   def update(self,dets):
@@ -202,10 +215,16 @@ class Sort(object):
       self.trackers.pop(t)
     matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks)
 
+    self.matched = matched
+    self.unmatched = unmatched_trks
+    
+
     #update matched trackers with assigned detections
     for t,trk in enumerate(self.trackers):
       if(t not in unmatched_trks):
         d = matched[np.where(matched[:,1]==t)[0],0]
+        track = matched[np.where(matched[:,1]==t)[0],1]
+        trk.change_matches((d, dets[d,:][0]))
         trk.update(dets[d,:][0])
 
     #create and initialise new trackers for unmatched detections
@@ -222,6 +241,7 @@ class Sort(object):
         if(trk.time_since_update > self.max_age):
           self.trackers.pop(i)
     if(len(ret)>0):
+      print(trk.objclass)
       return np.concatenate(ret)
     return np.empty((0,5))
     

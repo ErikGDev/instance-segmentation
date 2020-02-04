@@ -27,6 +27,14 @@ RESOLUTION_Y = 720
 NUM_BINS = 500
 MAX_RANGE = 10000
 
+img_size = 416
+
+"""
+class AssociatedDetection:
+
+    def __init__(self):
+"""
+
 
 def create_predictor():
     """
@@ -90,14 +98,17 @@ def format_results(predictions, class_names):
 
     boxes_list = boxes.tensor.tolist()
     scores_list = scores.tolist()
+    class_list = classes.tolist()
 
     for i in range(len(scores_list)):
         boxes_list[i].append(scores_list[i])
+        boxes_list[i].append(class_list[i])
     
-    boxes_list = np.asanyarray(boxes_list)
+    #print(boxes_list)
+    boxes_list = np.array(boxes_list)
     #print(scores_list)
     #print(type(scores_list))
-    print(boxes_list)
+    #print(boxes_list)
     #print(type(boxes_list))
     #print(scores)
     
@@ -131,7 +142,7 @@ def find_median_depth(mask_area, num_median, histg):
         if median_counter >= num_median:
             # Half of histogram is iterated through,
             # Therefore this bin contains the median
-            centre_depth = "{:.2f}m".format(x / 50)
+            centre_depth = x / 50
             break 
 
     return centre_depth
@@ -180,10 +191,15 @@ if __name__ == "__main__":
     profile = pipeline.start(config)
     align = rs.align(rs.stream.color)
 
+    cmap = plt.get_cmap('tab20b')
+    colors = [cmap(i)[:3] for i in np.linspace(0, 1, 20)]
+
     mot_tracker = Sort()
 
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
     print("Depth Scale is: {:.4f}m".format(depth_scale))
+
+    speed_time_start = time.time()
 
     while True:
         
@@ -194,15 +210,19 @@ if __name__ == "__main__":
 
         color_frame = frames.get_color_frame()
         depth_frame = frames.get_depth_frame()
+
+        depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
         
         # Convert image to numpy array
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
-        pad_x = max(color_image.shape[0] - color_image.shape[1], 0) * (RESOLUTION_Y / max(color_image.shape))
-        pad_y = max(color_image.shape[1] - color_image.shape[0], 0) * (RESOLUTION_Y / max(color_image.shape))
+        print(color_image.shape)
+
+        pad_x = max(color_image.shape[0] - color_image.shape[1], 0) * (RESOLUTION_X / max(color_image.shape))
+        pad_y = max(color_image.shape[1] - color_image.shape[0], 0) * (360 / max(color_image.shape))
         unpad_h = RESOLUTION_Y - pad_y
-        unpad_w = RESOLUTION_Y - pad_x
+        unpad_w = RESOLUTION_X - pad_x
 
         t1 = time.time()
 
@@ -216,6 +236,7 @@ if __name__ == "__main__":
         if outputs['instances'].has('pred_masks'):
             num_masks = len(predictions.pred_masks)
         else:
+            tracked_objects = mot_tracker.update(boxes_list)
             continue
         
         detectron_time = time.time()
@@ -223,35 +244,43 @@ if __name__ == "__main__":
         v = Visualizer(color_image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]))
         
         masks, boxes, boxes_list, labels = format_results(predictions, v.metadata.get("thing_classes"))
-        """
-        tracked_objects = mot_tracker.update(outputs['instances'])
-        unique_labels = labels.unique()
-        num_classes = len(unique_labels)
+        
+        tracked_objects = mot_tracker.update(boxes_list)
+        print(mot_tracker.matched)
+        #print(mot_tracker.trackers[0].matches)
+        #print(mot_tracker.trackers[0].kf.x[4])
+        #print(mot_tracker.trackers[0].kf.x[5])
+        #print(mot_tracker.trackers[0].kf.x[6])
+        #matched_objects = tracked_objects[1]
+        #unique_labels = labels.unique()
+        #num_classes = len(unique_labels)
+        #if tracked_objects:
         for x1, y1, x2, y2, obj_id, cls_pred in tracked_objects:
-            box_h = int(((y2 - y1) / unpad_h) * img.shape[0])
-            box_w = int(((x2 - x1) / unpad_w) * img.shape[1])
-            y1 = int(((y1 - pad_y // 2) / unpad_h) * img.shape[0])
-            x1 = int(((x1 - pad_x // 2) / unpad_w) * img.shape[1])
-
+            box_h = int(((y2 - y1) / unpad_h) * v.output.img.shape[0])
+            box_w = int(((x2 - x1) / unpad_w) * v.output.img.shape[1])
+            y1 = int(((y1 - pad_y // 2) / unpad_h) * v.output.img.shape[0])
+            x1 = int(((x1 - pad_x // 2) / unpad_w) * v.output.img.shape[1])
             color = colors[int(obj_id) % len(colors)]
             color = [i * 255 for i in color]
-            cls = classes[int(cls_pred)]
-            cv2.rectangle(color_image, (x1, y1), (x1+box_w, y1+box_h), color, 4)
-            cv2.rectangle(color_image, (x1, y1-35), (x1+len(cls)*19+60, y1), color, -1)
-            cv2.putText(color_image, cls + "-" + str(int(obj_id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 3)
+            #cls = classes[int(cls_pred)]
+            cv2.rectangle(v.output.img, (x1, y1), (x1+box_w, y1+box_h), color, 4)
+            cv2.rectangle(v.output.img, (x1, y1-35), (x1+len("CLASS")*19+60, y1), color, -1)
+            cv2.putText(v.output.img, "CLASS" + "-" + str(int(obj_id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 3)
 
-        """
+        
         #ret = np.asanyarray(outputs['instances'])
         #print(outputs['instances'])
         v.overlay_instances(
             masks=masks,
-            boxes=boxes,
+            boxes=None,
             labels=labels,
             keypoints=None,
             assigned_colors=None,
             alpha=0.3
         )
-        
+
+
+        speed_time_end = time.time()
         
         for i in range(num_masks):
             """
@@ -269,12 +298,34 @@ if __name__ == "__main__":
             #debug_plots(color_image, depth_image, masks[i].mask, histg, depth_colormap)
             
             centre_depth = find_median_depth(mask_area, num_median, histg)
-        
             cX, cY = find_mask_centre(masks[i]._mask, v.output)
+
+            track = mot_tracker.matched[np.where(mot_tracker.matched[:,0]==i)[0],1]
+            print("track: {}".format(track))
+            if len(track) > 0:
+                track = track[0]
+                if i not in mot_tracker.unmatched:
+                    try:
+                        if hasattr(mot_tracker.trackers[track], 'distance'):
+                            print("From {} to {} in {:.2f}s".format(mot_tracker.trackers[track].distance, centre_depth, speed_time_end - speed_time_start))
+                            mot_tracker.speed = (mot_tracker.trackers[track].distance - centre_depth)/(speed_time_end - speed_time_start)
+                            v.draw_text("{:.2f}m/s".format(mot_tracker.speed), (cX, cY + 40))
+
+                        mot_tracker.trackers[track].distance = centre_depth
+                        mot_tracker.trackers[track].position = rs.rs2_deproject_pixel_to_point(
+                            depth_intrin, [cX, cY], centre_depth
+                        )
+                        print(mot_tracker.trackers[track].position)
+                    
+                    except IndexError:
+                        continue
+
+
             v.draw_circle((cX, cY), (0, 0, 0))
-            v.draw_text(centre_depth, (cX, cY + 20))
+            v.draw_text("{:.2f}m".format(centre_depth), (cX, cY + 20))
             
-        
+        speed_time_start = time.time()
+
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         #cv2.imshow('Segmented Image', color_image)
         cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
