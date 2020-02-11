@@ -7,6 +7,10 @@ import math
 import argparse
 
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from mpl_toolkits.mplot3d import proj3d
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import FancyArrowPatch
 from sort import *
 
 from detectron2.engine import DefaultPredictor
@@ -35,6 +39,16 @@ class AssociatedDetection:
     def __init__(self):
 """
 
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
+        FancyArrowPatch.draw(self, renderer)
 
 def create_predictor():
     """
@@ -194,6 +208,7 @@ if __name__ == "__main__":
     cmap = plt.get_cmap('tab20b')
     colors = [cmap(i)[:3] for i in np.linspace(0, 1, 20)]
 
+    # Initialise Kalman filter tracker from Sort
     mot_tracker = Sort()
 
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
@@ -247,14 +262,7 @@ if __name__ == "__main__":
         
         tracked_objects = mot_tracker.update(boxes_list)
         print(mot_tracker.matched)
-        #print(mot_tracker.trackers[0].matches)
-        #print(mot_tracker.trackers[0].kf.x[4])
-        #print(mot_tracker.trackers[0].kf.x[5])
-        #print(mot_tracker.trackers[0].kf.x[6])
-        #matched_objects = tracked_objects[1]
-        #unique_labels = labels.unique()
-        #num_classes = len(unique_labels)
-        #if tracked_objects:
+
         for x1, y1, x2, y2, obj_id, cls_pred in tracked_objects:
             box_h = int(((y2 - y1) / unpad_h) * v.output.img.shape[0])
             box_w = int(((x2 - x1) / unpad_w) * v.output.img.shape[1])
@@ -306,16 +314,54 @@ if __name__ == "__main__":
                 track = track[0]
                 if i not in mot_tracker.unmatched:
                     try:
+                        """
                         if hasattr(mot_tracker.trackers[track], 'distance'):
-                            print("From {} to {} in {:.2f}s".format(mot_tracker.trackers[track].distance, centre_depth, speed_time_end - speed_time_start))
-                            mot_tracker.speed = (mot_tracker.trackers[track].distance - centre_depth)/(speed_time_end - speed_time_start)
-                            v.draw_text("{:.2f}m/s".format(mot_tracker.speed), (cX, cY + 40))
+                            
+                            mot_tracker.trackers[track].speed = (mot_tracker.trackers[track].distance - centre_depth)/(speed_time_end - speed_time_start)
+                            v.draw_text("{:.2f}m/s".format(mot_tracker.trackers[track].speed), (cX, cY + 40))
+                        """
+                        if hasattr(mot_tracker.trackers[track], 'position'):
+                            #print("From {} to {} in {:.2f}s".format(mot_tracker.trackers[track].distance, centre_depth, speed_time_end - speed_time_start))
+                            x1, y1, z1 = rs.rs2_deproject_pixel_to_point(
+                            depth_intrin, [cX, cY], centre_depth
+                        )
+                            
+
+                            mot_tracker.trackers[track].distance_3d = math.sqrt((x1 - mot_tracker.trackers[track].position[0])**2 + (y1 - mot_tracker.trackers[track].position[1])**2 + (z1 - mot_tracker.trackers[track].position[2])**2)
+                            mot_tracker.trackers[track].velocity = mot_tracker.trackers[track].distance_3d / (speed_time_end - speed_time_start)
+
+                            v.draw_text("{:.2f}m/s".format(mot_tracker.trackers[track].velocity), (cX, cY + 40))
+
+                            #axins = v.output.ax.inset_axes([cX - 50, cY - 50, 100, 100], transform=v.output.ax.transData)
+
+                            relative_x = (cX - 64) / RESOLUTION_X
+                            relative_y = (abs(RESOLUTION_Y - cY) - 36) / RESOLUTION_Y
+                            #print("relative_x: {}, relative_y: {}".format(relative_x, relative_y))
+                            """
+                            128
+                            72
+                            """
+                            ax = v.output.fig.add_axes([relative_x, relative_y, 0.1, 0.1], projection='3d')
+                            ax.set_xlim([-2, 2])
+                            ax.set_ylim([-2, 2])
+                            v_points = [x1 - mot_tracker.trackers[track].position[0], y1 - mot_tracker.trackers[track].position[1], z1 - mot_tracker.trackers[track].position[2]]
+                            print("Original position: {}".format(mot_tracker.trackers[track].position))
+                            print("New position: {}".format([x1, y1, z1]))
+                            print("Differences: {:.2f}, {:.2f}, {:.2f}".format(v_points[0], v_points[1], v_points[2]))
+                            #print(v_points)
+                            a = Arrow3D([0, 0], [0, 0], [0, 1], mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
+                            ax.add_artist(a)
+                            ax.axis("off")
+                            #ax.set_position = ([200, 200, 200, 200])
+                            #ax.set_position([500, 500, 500, 500])
+                            v.output.fig.add_axes(ax)
 
                         mot_tracker.trackers[track].distance = centre_depth
                         mot_tracker.trackers[track].position = rs.rs2_deproject_pixel_to_point(
                             depth_intrin, [cX, cY], centre_depth
                         )
-                        print(mot_tracker.trackers[track].position)
+
+                        
                     
                     except IndexError:
                         continue
@@ -335,8 +381,8 @@ if __name__ == "__main__":
         
         time_end = time.time()
         total_time = time_end - time_start
-        print("Time to process frame: {:.2f}".format(total_time))
-        print("FPS: {:.2f}\n".format(1/total_time))
+        #print("Time to process frame: {:.2f}".format(total_time))
+        #print("FPS: {:.2f}\n".format(1/total_time))
         
     pipeline.stop()
     cv2.destroyAllWindows()
