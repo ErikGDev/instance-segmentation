@@ -33,11 +33,39 @@ MAX_RANGE = 10000
 
 img_size = 416
 
-"""
-class AssociatedDetection:
 
-    def __init__(self):
-"""
+class DetectedObject:
+    """
+    Each object corresponds to all objects detected during the instance segmentation
+    phase. Associated trackers, distance, position and velocity are stored as attributes
+    of the object.
+    masks[i], boxes[i], labels[i], scores_list[i], class_list[i]
+    """
+    def __init__(self, mask, box, label, score, class_name):
+        self.mask = mask
+        self.box = box
+        self.label = label
+        self.score = score
+        self.class_name = class_name
+
+    def __str__(self):
+        ret_str = "The pixel mask of {} represents a {} and is {}m away from the camera.\n".format(self.mask, self.class_name, self.distance)
+        if hasattr(self, 'track'):
+            if hasattr(self.track, 'speed'):
+                if self.track.speed >= 0:
+                    ret_str += "The {} is travelling {}m/s towards the camera\n".format(self.class_name, self.track.speed)
+                else:
+                    ret_str += "The {} is travelling {}m/s away from the camera\n".format(self.class_name, abs(self.track.speed))
+            if hasattr(self.track, 'impact_time'):
+                ret_str += "The {} will collide in {} seconds\n".format(self.class_name, self.track.impact_time)
+            if hasattr(self.track, 'velocity'):
+                ret_str += "The {} is located at {} and travelling at {}m/s\n".format(self.class_name, self.track.position, self.track.velocity)
+        return ret_str
+
+    def create_vector_arrow(self):
+        arrow_ratio = 10 / max(abs(self.track.velocity_vector[0]), abs(self.track.velocity_vector[1]), abs(self.track.velocity_vector[2]))
+        self.track.v_points = [x * arrow_ratio for x in self.track.velocity_vector]
+
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
@@ -49,6 +77,7 @@ class Arrow3D(FancyArrowPatch):
         xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
         self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
         FancyArrowPatch.draw(self, renderer)
+
 
 def create_predictor():
     """
@@ -118,17 +147,10 @@ def format_results(predictions, class_names):
         boxes_list[i].append(scores_list[i])
         boxes_list[i].append(class_list[i])
     
-    #print(boxes_list)
+
     boxes_list = np.array(boxes_list)
-    #print(scores_list)
-    #print(type(scores_list))
-    #print(boxes_list)
-    #print(type(boxes_list))
-    #print(scores)
-    
-    #hello = np.append(boxes_list, scores_list)
-    #print(hello)
-    return (masks, boxes, boxes_list, labels)
+
+    return (masks, boxes, boxes_list, labels, scores_list, class_list)
     
 
 def find_mask_centre(mask, color_image):
@@ -159,7 +181,7 @@ def find_median_depth(mask_area, num_median, histg):
             centre_depth = x / 50
             break 
 
-    return centre_depth
+    return float(centre_depth)
 
 def debug_plots(color_image, depth_image, mask, histg, depth_colormap):
     """
@@ -232,7 +254,6 @@ if __name__ == "__main__":
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
-        print(color_image.shape)
 
         pad_x = max(color_image.shape[0] - color_image.shape[1], 0) * (RESOLUTION_X / max(color_image.shape))
         pad_y = max(color_image.shape[1] - color_image.shape[0], 0) * (360 / max(color_image.shape))
@@ -240,6 +261,8 @@ if __name__ == "__main__":
         unpad_w = RESOLUTION_X - pad_x
 
         t1 = time.time()
+
+        detected_objects = []
 
         outputs = predictor(color_image)
         
@@ -258,11 +281,21 @@ if __name__ == "__main__":
 
         v = Visualizer(color_image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]))
         
-        masks, boxes, boxes_list, labels = format_results(predictions, v.metadata.get("thing_classes"))
-        
-        tracked_objects = mot_tracker.update(boxes_list)
-        print(mot_tracker.matched)
+        masks, boxes, boxes_list, labels, scores_list, class_list = format_results(predictions, v.metadata.get("thing_classes"))
 
+
+        for i in range(num_masks):
+            try:
+                detected_obj = DetectedObject(masks[i], boxes[i], labels[i], scores_list[i], class_list[i])
+            except:
+                print("Object doesn't meet all parameters")
+            
+            detected_objects.append(detected_obj)
+
+
+        tracked_objects = mot_tracker.update(boxes_list)
+
+        """
         for x1, y1, x2, y2, obj_id, cls_pred in tracked_objects:
             box_h = int(((y2 - y1) / unpad_h) * v.output.img.shape[0])
             box_w = int(((x2 - x1) / unpad_w) * v.output.img.shape[1])
@@ -271,16 +304,15 @@ if __name__ == "__main__":
             color = colors[int(obj_id) % len(colors)]
             color = [i * 255 for i in color]
             #cls = classes[int(cls_pred)]
-            cv2.rectangle(v.output.img, (x1, y1), (x1+box_w, y1+box_h), color, 4)
+            cv2.rectangle(v.output.img, (x1, y1), (x1+box_w, y1+box_h), color, 2)
             cv2.rectangle(v.output.img, (x1, y1-35), (x1+len("CLASS")*19+60, y1), color, -1)
             cv2.putText(v.output.img, "CLASS" + "-" + str(int(obj_id)), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 3)
 
-        
-        #ret = np.asanyarray(outputs['instances'])
-        #print(outputs['instances'])
+        """
+
         v.overlay_instances(
             masks=masks,
-            boxes=None,
+            boxes=boxes,
             labels=labels,
             keypoints=None,
             assigned_colors=None,
@@ -296,66 +328,71 @@ if __name__ == "__main__":
             and depth range of (0 - MAX_RANGE millimeters)
             """
         
-            mask_area = masks[i].area()
+            mask_area = detected_objects[i].mask.area()
             num_median = math.floor(mask_area / 2)
             
-            histg = cv2.calcHist([depth_image], [0], masks[i].mask, [NUM_BINS], [0, MAX_RANGE])
+            histg = cv2.calcHist([depth_image], [0], detected_objects[i].mask.mask, [NUM_BINS], [0, MAX_RANGE])
             depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
             
             # Uncomment this to use the debugging function
             #debug_plots(color_image, depth_image, masks[i].mask, histg, depth_colormap)
             
             centre_depth = find_median_depth(mask_area, num_median, histg)
-            cX, cY = find_mask_centre(masks[i]._mask, v.output)
+            detected_objects[i].distance = centre_depth
+            cX, cY = find_mask_centre(detected_objects[i].mask._mask, v.output)
 
+            # track refers to the index of the detected mask which matches the tracker
             track = mot_tracker.matched[np.where(mot_tracker.matched[:,0]==i)[0],1]
-            print("track: {}".format(track))
+            
             if len(track) > 0:
                 track = track[0]
                 if i not in mot_tracker.unmatched:
                     try:
-                        """
+                        
                         if hasattr(mot_tracker.trackers[track], 'distance'):
                             
                             mot_tracker.trackers[track].speed = (mot_tracker.trackers[track].distance - centre_depth)/(speed_time_end - speed_time_start)
-                            v.draw_text("{:.2f}m/s".format(mot_tracker.trackers[track].speed), (cX, cY + 40))
-                        """
+                            try:
+                                mot_tracker.trackers[track].impact_time = centre_depth / mot_tracker.trackers[track].speed
+
+                            except:
+                                mot_tracker.trackers[track].impact_time = False
+
+                            if mot_tracker.trackers[track].impact_time != False and mot_tracker.trackers[track].impact_time >= 0:
+                                v.draw_text("{:.2f} seconds to impact".format(mot_tracker.trackers[track].impact_time), (cX, cY + 60))
+                        
                         if hasattr(mot_tracker.trackers[track], 'position'):
-                            #print("From {} to {} in {:.2f}s".format(mot_tracker.trackers[track].distance, centre_depth, speed_time_end - speed_time_start))
+                            
                             x1, y1, z1 = rs.rs2_deproject_pixel_to_point(
                             depth_intrin, [cX, cY], centre_depth
                         )
                             
-
+                            mot_tracker.trackers[track].velocity_vector = [x1 - mot_tracker.trackers[track].position[0], y1 - mot_tracker.trackers[track].position[1], z1 - mot_tracker.trackers[track].position[2]]
                             mot_tracker.trackers[track].distance_3d = math.sqrt((x1 - mot_tracker.trackers[track].position[0])**2 + (y1 - mot_tracker.trackers[track].position[1])**2 + (z1 - mot_tracker.trackers[track].position[2])**2)
                             mot_tracker.trackers[track].velocity = mot_tracker.trackers[track].distance_3d / (speed_time_end - speed_time_start)
 
-                            v.draw_text("{:.2f}m/s".format(mot_tracker.trackers[track].velocity), (cX, cY + 40))
+                            detected_objects[track].track = mot_tracker.trackers[track]
 
-                            #axins = v.output.ax.inset_axes([cX - 50, cY - 50, 100, 100], transform=v.output.ax.transData)
+                            v.draw_text("{:.2f}m/s".format(detected_objects[track].track.velocity), (cX, cY + 40))
 
                             relative_x = (cX - 64) / RESOLUTION_X
                             relative_y = (abs(RESOLUTION_Y - cY) - 36) / RESOLUTION_Y
-                            #print("relative_x: {}, relative_y: {}".format(relative_x, relative_y))
-                            """
-                            128
-                            72
-                            """
-                            ax = v.output.fig.add_axes([relative_x, relative_y, 0.1, 0.1], projection='3d')
-                            ax.set_xlim([-2, 2])
-                            ax.set_ylim([-2, 2])
-                            v_points = [x1 - mot_tracker.trackers[track].position[0], y1 - mot_tracker.trackers[track].position[1], z1 - mot_tracker.trackers[track].position[2]]
-                            print("Original position: {}".format(mot_tracker.trackers[track].position))
-                            print("New position: {}".format([x1, y1, z1]))
-                            print("Differences: {:.2f}, {:.2f}, {:.2f}".format(v_points[0], v_points[1], v_points[2]))
-                            #print(v_points)
-                            a = Arrow3D([0, 0], [0, 0], [0, 1], mutation_scale=20, lw=1, arrowstyle="-|>", color="k")
-                            ax.add_artist(a)
-                            ax.axis("off")
-                            #ax.set_position = ([200, 200, 200, 200])
-                            #ax.set_position([500, 500, 500, 500])
-                            v.output.fig.add_axes(ax)
 
+                            # Show velocity vector arrow if velocity >= 1 m/s
+                            if detected_objects[track].track.velocity >= 1:
+                                ax = v.output.fig.add_axes([relative_x, relative_y, 0.1, 0.1], projection='3d')
+                                ax.set_xlim([-10, 10])
+                                ax.set_ylim([-10, 10])
+                                ax.set_zlim([-10, 10])
+                                
+                                #print(v_points)
+                                detected_objects[track].create_vector_arrow()
+                                a = Arrow3D([0, detected_objects[track].track.v_points[0]], [0, detected_objects[track].track.v_points[1]], [0, detected_objects[track].track.v_points[2]], mutation_scale=10, lw=1, arrowstyle="-|>", color="w")
+                                ax.add_artist(a)
+                                #ax.axis("off")
+                                ax.set_facecolor((1, 1, 1, 0))
+                                v.output.fig.add_axes(ax)
+                            
                         mot_tracker.trackers[track].distance = centre_depth
                         mot_tracker.trackers[track].position = rs.rs2_deproject_pixel_to_point(
                             depth_intrin, [cX, cY], centre_depth
@@ -372,6 +409,9 @@ if __name__ == "__main__":
             
         speed_time_start = time.time()
 
+        #for i in detected_objects:
+            #print(i)
+
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         #cv2.imshow('Segmented Image', color_image)
         cv2.imshow('Segmented Image', v.output.get_image()[:, :, ::-1])
@@ -381,8 +421,8 @@ if __name__ == "__main__":
         
         time_end = time.time()
         total_time = time_end - time_start
-        #print("Time to process frame: {:.2f}".format(total_time))
-        #print("FPS: {:.2f}\n".format(1/total_time))
+        print("Time to process frame: {:.2f}".format(total_time))
+        print("FPS: {:.2f}\n".format(1/total_time))
         
     pipeline.stop()
     cv2.destroyAllWindows()
