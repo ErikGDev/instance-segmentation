@@ -111,3 +111,16 @@ For smaller intervals of 0.01m, change the NUM_BINS constant to 1000, and change
 ```centre_depth = "{:.2f}m".format(x / 50)```
 to
 ```centre_depth = "{:.2f}m".format(x / 100)```
+
+## Object Tracking
+
+The purpose of this project is to propose where objects exists in the environment around a robot. In addition to this, it would be ideal to understand the movement of each object. 
+
+**Simple Online and Real-time Tracking (SORT)**
+
+The velocity, linear speed (between camera and object), and time to impact were all calculated using an altered version of [Chris Fotache's implementation of SORT with PyTorch](https://github.com/cfotache/pytorch_objectdetecttrack), created by [Alex Bewley](https://github.com/abewley/), Zongyuan Ge, Lionel Ott, Fabio Ramos and Ben Upcroft.
+
+Simple Online and Real-time Tracking (SORT) paper: https://arxiv.org/abs/1602.00763</br>
+Original python implementation of SORT by Alex Bewley: https://github.com/abewley/sort
+
+SORT proposes using a Kalman filter to predict the trajectory of previously identified objects, and then match them with newly identified objects. In this program, when an object is matched with a detection, the real-world position and distance from camera are added as attributes to the KalmanBoxTracker object. When the same object is tracked to the next frame, linear speed, velocity, real-world distance, and time until impact are all added under the same object. Each KalmanBoxTracker is added to the appropriate DetectedObject as the attribute DetectredObject.track. This means all the data can be passed to an API using a single DetectedObject.
