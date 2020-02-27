@@ -338,13 +338,9 @@ if __name__ == "__main__":
                     try:
                         # If the tracker's distance has already been initialised - tracker has been detected previously
                         if hasattr(mot_tracker.trackers[track], 'distance'):
-                            
-                            mot_tracker.trackers[track].speed = (mot_tracker.trackers[track].distance - centre_depth)/(total_speed_time)
-                            try:
-                                mot_tracker.trackers[track].impact_time = centre_depth / mot_tracker.trackers[track].speed
+                            mot_tracker.trackers[track].set_speed(centre_depth, total_speed_time)
 
-                            except:
-                                mot_tracker.trackers[track].impact_time = False
+                            mot_tracker.trackers[track].set_impact_time(centre_depth)
 
                             if mot_tracker.trackers[track].impact_time != False and mot_tracker.trackers[track].impact_time >= 0:
                                 v.draw_text("{:.2f} seconds to impact".format(mot_tracker.trackers[track].impact_time), (cX, cY + 60))
@@ -384,20 +380,19 @@ if __name__ == "__main__":
                                 ax.set_facecolor((1, 1, 1, 0))
                                 v.output.fig.add_axes(ax)
                             """
-                            
-                            
-                        mot_tracker.trackers[track].distance = centre_depth
-                        mot_tracker.trackers[track].position = rs.rs2_deproject_pixel_to_point(
+
+                        position = rs.rs2_deproject_pixel_to_point(
                             depth_intrin, [cX, cY], centre_depth
-                        )
+                        )    
+                            
+                        mot_tracker.trackers[track].set_distance(centre_depth)
+                        mot_tracker.trackers[track].set_position(position)
 
                         
                     
                     except IndexError:
                         continue
 
-                #else:
-                    #print(convert_x_to_bbox(mot_tracker.trackers[i].kf.x))
 
             v.draw_circle((cX, cY), (0, 0, 0))
             v.draw_text("{:.2f}m".format(centre_depth), (cX, cY + 20))

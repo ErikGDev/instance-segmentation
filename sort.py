@@ -143,6 +143,33 @@ class KalmanBoxTracker(object):
     """
     self.velocity = self.distance_3d / (total_time)
 
+  def set_speed(self, new_distance, total_time):
+    """
+    Set linear speed of object with regards to camera
+    """
+    self.speed = (self.distance - new_distance)/total_time
+
+  def set_impact_time(self, distance):
+    """
+    Calculate time until impact from robot to camera
+    """
+    try:
+      self.impact_time = distance / self.speed
+    except:
+      self.impact_time = False
+
+  def set_distance(self, distance):
+    """
+    Set distance of object from camera
+    """
+    self.distance = distance
+
+  def set_position(self, position):
+    """
+    Set real-world coordinate position for object
+    """
+    self.position = position
+
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
   """
   Assigns detections to tracked object (both represented as bounding boxes)
