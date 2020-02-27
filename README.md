@@ -124,3 +124,7 @@ Simple Online and Real-time Tracking (SORT) paper: https://arxiv.org/abs/1602.00
 Original python implementation of SORT by Alex Bewley: https://github.com/abewley/sort
 
 SORT proposes using a Kalman filter to predict the trajectory of previously identified objects, and then match them with newly identified objects. In this program, when an object is matched with a detection, the real-world position and distance from camera are added as attributes to the KalmanBoxTracker object. When the same object is tracked to the next frame, linear speed, velocity, real-world distance, and time until impact are all added under the same object. Each KalmanBoxTracker is added to the appropriate DetectedObject as the attribute DetectredObject.track. This means all the data can be passed to an API using a single DetectedObject.
+
+**Velocity Vector Arrows**
+
+Optionally, vector arrows can be superimposed on the image. These vector arrows show the direction the object is moving in 3D space. Each arrow is represented through the Arrow3D class, which essentially is the same as the FancyArrowPatch class from matplotlib, with additional 3D support.
