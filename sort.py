@@ -9,6 +9,7 @@ from skimage import io
 from sklearn.utils.linear_assignment_ import linear_assignment
 import glob
 import time
+import math
 import argparse
 from filterpy.kalman import KalmanFilter
 
@@ -83,7 +84,7 @@ class KalmanBoxTracker(object):
     self.hits = 0
     self.hit_streak = 0
     self.age = 0
-    self.objclass = bbox[4]
+    self.objclass = bbox[5]
     self.matches = {}
 
   def update(self,bbox):
@@ -123,6 +124,24 @@ class KalmanBoxTracker(object):
     dets = dets.tolist()
     self.matches[d] = dets
     #print("d: {}\ndets: {}".format(d, dets))
+  
+  def set_velocity_vector(self, x1, y1, z1):
+    """
+    Sets velocity vector based on old and new positions (x1, y1, z1)
+    """
+    self.velocity_vector = [x1 - self.position[0], y1 - self.position[1], z1 - self.position[2]]
+
+  def set_distance_3d(self, x1, y1, z1):
+    """
+    Return 3D distance of object from old position to its new position (x1, y1, z1)
+    """
+    self.distance_3d = math.sqrt((x1 - self.position[0])**2 + (y1 - self.position[1])**2 + (z1 - self.position[2])**2)
+
+  def set_velocity(self, total_time):
+    """
+    Set velocity based on 3D distance and total time between each frame 
+    """
+    self.velocity = self.distance_3d / (total_time)
 
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
   """
