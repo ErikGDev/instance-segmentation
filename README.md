@@ -85,8 +85,8 @@ from [Intel D400 Datasheet](https://www.mouser.ca/pdfdocs/Intel_D400_Series_Data
 
 The D435 recordings were measured on the [realsense-viewer](https://github.com/IntelRealSense/librealsense/tree/master/tools/realsense-viewer) program. The stereo resolution was set to 1280 x 720. Rather than the depth RMS error, the absolute depth error was compared to the real distance of the object to the D435.
 
-<img src="Screenshot_38.png" />
-<img src="Screenshot_37.png" />
+<img src="figures/d435_error_table.png" />
+<img src="figures/d435_error_graph.png" />
 
 This graph shows that the absolute error appears to exponentially increases when the distance increases. This means the depth recordings will be most accurate when the object is closer to the camera.
 
