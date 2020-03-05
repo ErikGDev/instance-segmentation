@@ -219,8 +219,13 @@ def debug_plots(color_image, depth_image, mask, histg, depth_colormap):
 
 if __name__ == "__main__":
 
-    # Used for  
+    # Used for testing
     times_list = []
+    camera_times = []
+    model_times = []
+    post_processing_times = []
+    checker = 0
+    times_dict = {}
 
     cfg, predictor = create_predictor()
 
@@ -261,13 +266,17 @@ if __name__ == "__main__":
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
+        detected_objects = []
+
         t1 = time.time()
 
-        detected_objects = []
+        camera_time = t1 - time_start
+        
         outputs = predictor(color_image)
 
         t2 = time.time()
-        print("Model took {:.2f} time".format(t2 - t1))
+        model_time = t2 - t1
+        print("Model took {:.2f} time".format(model_time))
 
         predictions = outputs['instances']
 
@@ -296,6 +305,7 @@ if __name__ == "__main__":
 
         tracked_objects = mot_tracker.update(boxes_list)
 
+        
         v.overlay_instances(
             masks=masks,
             boxes=boxes,
@@ -304,8 +314,7 @@ if __name__ == "__main__":
             assigned_colors=None,
             alpha=0.3
         )
-
-
+        
         speed_time_end = time.time()
         total_speed_time = speed_time_end - speed_time_start
         speed_time_start = time.time()
@@ -319,9 +328,10 @@ if __name__ == "__main__":
             num_median = math.floor(mask_area / 2)
             
             histg = cv2.calcHist([depth_image], [0], detected_objects[i].mask.mask, [NUM_BINS], [0, MAX_RANGE])
-            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+            
             
             # Uncomment this to use the debugging function
+            #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
             #debug_plots(color_image, depth_image, masks[i].mask, histg, depth_colormap)
             
             centre_depth = find_median_depth(mask_area, num_median, histg)
@@ -360,8 +370,8 @@ if __name__ == "__main__":
 
                             v.draw_text("{:.2f}m/s".format(detected_objects[i].track.velocity), (cX, cY + 40))
 
-                            relative_x = (cX - 64) / RESOLUTION_X
-                            relative_y = (abs(RESOLUTION_Y - cY) - 36) / RESOLUTION_Y
+                            #relative_x = (cX - 64) / RESOLUTION_X
+                            #relative_y = (abs(RESOLUTION_Y - cY) - 36) / RESOLUTION_Y
 
                             
                             # Show velocity vector arrow if velocity >= 1 m/s
@@ -389,7 +399,6 @@ if __name__ == "__main__":
                         mot_tracker.trackers[track].set_position(position)
 
                         
-                    
                     except IndexError:
                         continue
 
@@ -410,13 +419,9 @@ if __name__ == "__main__":
         
         time_end = time.time()
         total_time = time_end - time_start
-        #times_list.append(total_time)
-        #if len(times_list) == 100:
-            #break
+
         print("Time to process frame: {:.2f}".format(total_time))
         print("FPS: {:.2f}\n".format(1/total_time))
         
     pipeline.stop()
     cv2.destroyAllWindows()
-    
-#print("Min: {}\nMax: {}\nMean:{}".format(min(times_list),max(times_list), sum(times_list)/len(times_list)))

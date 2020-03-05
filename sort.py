@@ -273,7 +273,7 @@ class Sort(object):
         if(trk.time_since_update > self.max_age):
           self.trackers.pop(i)
     if(len(ret)>0):
-      print(trk.objclass)
+      #print(trk.objclass)
       return np.concatenate(ret)
     return np.empty((0,5))
     
