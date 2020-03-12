@@ -1086,64 +1086,8 @@ class Visualizer:
             """
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             """
-            return boxes.tensor.cpu().numpy()
+            return boxes.tensor.numpy()
         else:
             return np.asarray(boxes)
 

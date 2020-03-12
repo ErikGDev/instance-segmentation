@@ -6,6 +6,7 @@ import random
 import math
 import argparse
 
+from threading import Thread
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from mpl_toolkits.mplot3d import proj3d
@@ -18,6 +19,7 @@ from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.utils.visualizer import GenericMask
 from detectron2.utils.visualizer import ColorMode
+from detectron2.structures import Boxes, RotatedBoxes
 
 from detectron2.data import MetadataCatalog
 
@@ -32,6 +34,168 @@ NUM_BINS = 500
 MAX_RANGE = 10000
 
 AXES_SIZE = 10
+
+
+
+class VideoStreamer:
+    """
+    Video streamer that takes advantage of multi-threading, and continuously is reading frames.
+    Frames are then ready to read when program requires.
+    """
+    def __init__(self, video_file=None):
+        """
+        When initialised, VideoStreamer object should be reading frames
+        """
+        self.setup_image_config(video_file)
+        self.configure_streams()
+        self.stopped = False
+
+    def start(self):
+        """
+        Initialise thread, update method will run under thread
+        """
+        Thread(target=self.update, args=()).start()
+        return self
+
+    def update(self):
+        """
+        Constantly read frames until stop() method is introduced
+        """
+        while True:
+
+            if self.stopped:
+                return
+
+            frames = self.pipeline.wait_for_frames()
+            frames = self.align.process(frames)
+
+            color_frame = frames.get_color_frame()
+            depth_frame = frames.get_depth_frame()
+
+            self.depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
+            
+            # Convert image to numpy array and initialise images
+            self.color_image = np.asanyarray(color_frame.get_data())
+            self.depth_image = np.asanyarray(depth_frame.get_data())
+
+
+    def stop(self):
+        self.pipeline.stop()
+        self.stopped = True
+
+    def read(self):
+        return (self.color_image, self.depth_image)
+
+    def setup_image_config(self, video_file=None):
+        """
+        Setup config and video steams. If --file is specified as an argument, setup
+        stream from file. The input of --file is a .bag file in the bag_files folder.
+        .bag files can be created using d435_to_file in the tools folder.
+        video_file is by default None, and thus will by default stream from the 
+        device connected to the USB.
+        """
+        config = rs.config()
+
+        if video_file is None:
+            
+            config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
+            config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
+        else:
+            try:
+                config.enable_device_from_file("bag_files/{}".format(video_file))
+            except:
+                print("Cannot enable device from: '{}'".format(video_file))
+
+        self.config = config
+
+    def configure_streams(self):
+        # Configure video streams
+        self.pipeline = rs.pipeline()
+    
+        # Start streaming
+        self.profile = self.pipeline.start(self.config)
+        self.align = rs.align(rs.stream.color)
+
+    def get_depth_scale(self):
+        return self.profile.get_device().first_depth_sensor().get_depth_scale()
+
+
+
+class Predictor(DefaultPredictor):
+    def __init__(self):
+        self.config = self.setup_predictor_config()
+        super().__init__(self.config)
+
+    def create_outputs(self, color_image):
+        self.outputs = self(color_image)
+
+    def setup_predictor_config(self):
+        """
+        Setup config and return predictor. See config/defaults.py for more options
+        """
+        cfg = get_cfg()
+
+        cfg.merge_from_file("configs/COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml")
+        cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
+        # Mask R-CNN ResNet101 FPN weights
+        cfg.MODEL.WEIGHTS = "model_final_a3ec72.pkl"
+        # This determines the resizing of the image. At 0, resizing is disabled.
+        cfg.INPUT.MIN_SIZE_TEST = 0
+
+        return cfg
+
+    def format_results(self, class_names):
+        """
+        Format results so they can be used by overlay_instances function
+        """
+        predictions = self.outputs['instances']
+        boxes = predictions.pred_boxes if predictions.has("pred_boxes") else None
+        scores = predictions.scores if predictions.has("scores") else None
+        classes = predictions.pred_classes if predictions.has("pred_classes") else None
+
+        labels = None 
+        if classes is not None and class_names is not None and len(class_names) > 1:
+            labels = [class_names[i] for i in classes]
+        if scores is not None:
+            if labels is None:
+                labels = ["{:.0f}%".format(s * 100) for s in scores]
+            else:
+                labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
+
+        masks = predictions.pred_masks.cpu().numpy()
+        masks = [GenericMask(x, v.output.height, v.output.width) for x in masks]
+
+        boxes_list = boxes.tensor.tolist()
+        scores_list = scores.tolist()
+        class_list = classes.tolist()
+
+        for i in range(len(scores_list)):
+            boxes_list[i].append(scores_list[i])
+            boxes_list[i].append(class_list[i])
+        
+
+        boxes_list = np.array(boxes_list)
+
+        return (masks, boxes, boxes_list, labels, scores_list, class_list)    
+
+
+
+class OptimizedVisualizer(Visualizer):
+    """
+    Detectron2's altered Visualizer class which converts boxes tensor to cpu
+    """
+    def __init__(self, img_rgb, metadata, scale=1.0, instance_mode=ColorMode.IMAGE):
+        super().__init__(img_rgb, metadata, scale, instance_mode)
+    
+    def _convert_boxes(self, boxes):
+        """
+        Convert different format of boxes to an NxB array, where B = 4 or 5 is the box dimension.
+        """
+        if isinstance(boxes, Boxes) or isinstance(boxes, RotatedBoxes):
+            return boxes.tensor.cpu().numpy()
+        else:
+            return np.asarray(boxes)
+
 
 
 class DetectedObject:
@@ -87,79 +251,6 @@ class Arrow3D(FancyArrowPatch):
         FancyArrowPatch.draw(self, renderer)
 
 
-
-def create_predictor():
-    """
-    Setup config and return predictor. See config/defaults.py for more options
-    """
-    cfg = get_cfg()
-
-    cfg.merge_from_file("configs/COCO-InstanceSegmentation/mask_rcnn_R_101_FPN_3x.yaml")
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
-    # Mask R-CNN ResNet101 FPN weights
-    cfg.MODEL.WEIGHTS = "model_final_a3ec72.pkl"
-    # This determines the resizing of the image. At 0, resizing is disabled.
-    cfg.INPUT.MIN_SIZE_TEST = 0
-
-    return (cfg, DefaultPredictor(cfg))
-
-
-def setup_image_config(video_file=None):
-    """
-    Setup config and video steams. If --file is specified as an argument, setup
-    stream from file. The input of --file is a .bag file in the bag_files folder.
-    .bag files can be created using d435_to_file in the tools folder.
-    video_file is by default None, and thus will by default stream from the 
-    device connected to the USB.
-    """
-    config = rs.config()
-
-    if video_file is None:
-        
-        config.enable_stream(rs.stream.depth, RESOLUTION_X, RESOLUTION_Y, rs.format.z16, 30)
-        config.enable_stream(rs.stream.color, RESOLUTION_X, RESOLUTION_Y, rs.format.bgr8, 30)
-    else:
-        try:
-            config.enable_device_from_file("bag_files/{}".format(video_file))
-        except:
-            print("Cannot enable device from: '{}'".format(video_file))
-
-    return config
-
-
-def format_results(predictions, class_names):
-    """
-    Format results so they can be used by overlay_instances function
-    """
-    boxes = predictions.pred_boxes if predictions.has("pred_boxes") else None
-    scores = predictions.scores if predictions.has("scores") else None
-    classes = predictions.pred_classes if predictions.has("pred_classes") else None
-
-    labels = None 
-    if classes is not None and class_names is not None and len(class_names) > 1:
-        labels = [class_names[i] for i in classes]
-    if scores is not None:
-        if labels is None:
-            labels = ["{:.0f}%".format(s * 100) for s in scores]
-        else:
-            labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
-
-    masks = predictions.pred_masks.cpu().numpy()
-    masks = [GenericMask(x, v.output.height, v.output.width) for x in masks]
-
-    boxes_list = boxes.tensor.tolist()
-    scores_list = scores.tolist()
-    class_list = classes.tolist()
-
-    for i in range(len(scores_list)):
-        boxes_list[i].append(scores_list[i])
-        boxes_list[i].append(class_list[i])
-    
-
-    boxes_list = np.array(boxes_list)
-
-    return (masks, boxes, boxes_list, labels, scores_list, class_list)
-    
 
 def find_mask_centre(mask, color_image):
     """
@@ -218,67 +309,47 @@ def debug_plots(color_image, depth_image, mask, histg, depth_colormap):
     plt.show()
 
 if __name__ == "__main__":
-
-    # Used for testing
-    times_list = []
-    camera_times = []
-    model_times = []
-    post_processing_times = []
-    checker = 0
-    times_dict = {}
-
-    cfg, predictor = create_predictor()
-
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--file', help='type --file=file-name.bag to stream using file instead of webcam')
     args = parser.parse_args()
-    
-    config = setup_image_config(args.file)
 
-    # Configure video streams
-    pipeline = rs.pipeline()
-    
-    # Start streaming
-    profile = pipeline.start(config)
-    align = rs.align(rs.stream.color)
+    # Initialise Detectron2 predictor
+    predictor = Predictor()
+
+    # Initialise video streams from D435
+    video_streamer = VideoStreamer()
 
     # Initialise Kalman filter tracker from modified Sort module
     mot_tracker = Sort()
 
-    depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
+    depth_scale = video_streamer.get_depth_scale()
     print("Depth Scale is: {:.4f}m".format(depth_scale))
 
     speed_time_start = time.time()
 
+    video_streamer.start()
+    time.sleep(1)
+
     while True:
         
         time_start = time.time()
-        
-        frames = pipeline.wait_for_frames()
-        frames = align.process(frames)
-
-        color_frame = frames.get_color_frame()
-        depth_frame = frames.get_depth_frame()
-
-        depth_intrin = depth_frame.profile.as_video_stream_profile().intrinsics
-        
-        # Convert image to numpy array
-        color_image = np.asanyarray(color_frame.get_data())
-        depth_image = np.asanyarray(depth_frame.get_data())
-
+        color_image, depth_image = video_streamer.read()
         detected_objects = []
 
         t1 = time.time()
 
         camera_time = t1 - time_start
         
-        outputs = predictor(color_image)
+        predictor.create_outputs(color_image)
+        outputs = predictor.outputs
 
         t2 = time.time()
         model_time = t2 - t1
         print("Model took {:.2f} time".format(model_time))
 
         predictions = outputs['instances']
+        
 
         if outputs['instances'].has('pred_masks'):
             num_masks = len(predictions.pred_masks)
@@ -290,9 +361,9 @@ if __name__ == "__main__":
         detectron_time = time.time()
 
         # Create a new Visualizer object from Detectron2 
-        v = Visualizer(color_image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]))
+        v = OptimizedVisualizer(color_image[:, :, ::-1], MetadataCatalog.get(predictor.config.DATASETS.TRAIN[0]))
         
-        masks, boxes, boxes_list, labels, scores_list, class_list = format_results(predictions, v.metadata.get("thing_classes"))
+        masks, boxes, boxes_list, labels, scores_list, class_list = predictor.format_results(v.metadata.get("thing_classes"))
 
         for i in range(num_masks):
             try:
@@ -358,7 +429,7 @@ if __name__ == "__main__":
                         if hasattr(mot_tracker.trackers[track], 'position'):
                             # New 3D coordinates for current frame
                             x1, y1, z1 = rs.rs2_deproject_pixel_to_point(
-                            depth_intrin, [cX, cY], centre_depth
+                            video_streamer.depth_intrin, [cX, cY], centre_depth
                         )
                             
                             # Update states for tracked object
@@ -392,7 +463,7 @@ if __name__ == "__main__":
                             """
 
                         position = rs.rs2_deproject_pixel_to_point(
-                            depth_intrin, [cX, cY], centre_depth
+                            video_streamer.depth_intrin, [cX, cY], centre_depth
                         )    
                             
                         mot_tracker.trackers[track].set_distance(centre_depth)
@@ -423,5 +494,5 @@ if __name__ == "__main__":
         print("Time to process frame: {:.2f}".format(total_time))
         print("FPS: {:.2f}\n".format(1/total_time))
         
-    pipeline.stop()
+    video_streamer.stop()
     cv2.destroyAllWindows()
